@@ -1,0 +1,149 @@
+/* Globus web-app palette: blue #0b5ea8 accents, grey text, white-ish panels */
+Screen {
+    layout: vertical;
+}
+
+#topbar {
+    height: 3;
+    padding: 0 2;
+    background: $surface;
+    border-bottom: solid $primary 30%;
+}
+#topbar .title {
+    text-style: bold;
+    width: 1fr;
+    color: $text;
+}
+#topbar .meta {
+    width: auto;
+    color: $text-muted;
+}
+
+/* ---------- dashboard ---------- */
+#dash-body {
+    padding: 1 2;
+    height: 1fr;
+}
+.section-title {
+    text-style: bold;
+    margin: 1 0 0 0;
+}
+#stat-row {
+    height: 5;
+    margin-top: 1;
+}
+.stat {
+    width: 26;
+    height: 5;
+    margin-right: 2;
+    padding: 0 1;
+    border: round $surface-lighten-2;
+    border-left: thick $primary;
+}
+.stat.failed { border-left: thick $error; }
+.stat.ok { border-left: thick $success; }
+.stat .num { text-style: bold; }
+.stat .cap { color: $text-muted; }
+#active-list {
+    height: auto;
+    max-height: 14;
+    margin-top: 1;
+}
+#active-table { height: auto; }
+#flows-box, #notes-box {
+    height: auto;
+    margin-top: 1;
+    color: $text-muted;
+}
+.hint {
+    color: $text-muted;
+    margin-top: 1;
+}
+.tip {
+    margin-top: 1;
+    padding: 1 2;
+    background: $primary 12%;
+    color: $text;
+}
+
+/* ---------- tasks ---------- */
+#search {
+    margin: 0 2;
+    border: tall $primary 50%;
+}
+#filterbar {
+    height: 1;
+    margin: 0 2;
+    color: $text-muted;
+}
+#task-table {
+    margin: 0 2;
+    height: 1fr;
+}
+DataTable > .datatable--cursor {
+    background: $primary 30%;
+}
+#empty {
+    margin: 1 2;
+    color: $text-muted;
+}
+
+/* ---------- detail ---------- */
+#detail-head {
+    height: 3;
+    padding: 0 2;
+}
+#detail-head .lbl { text-style: bold; width: 1fr; }
+#detail-head .sub { color: $text-muted; }
+#detail-progress { width: 40; margin-left: 2; }
+TabbedContent { height: 1fr; }
+#overview-body { padding: 1 2; height: 1fr; }
+#kv { width: 1fr; }
+#stats {
+    width: 44;
+    height: auto;
+    margin-left: 2;
+    padding: 1 2;
+    border: round $surface-lighten-2;
+}
+#actions { width: 44; height: auto; margin-left: 2; color: $text-muted; }
+#events-body { height: 1fr; padding: 0 2; }
+#event-table { width: 1fr; height: 1fr; }
+#event-side { width: 52; margin-left: 2; height: 1fr; }
+#event-detail {
+    height: 1fr;
+    border: round $surface-lighten-2;
+    padding: 0 1;
+    overflow-y: auto;
+}
+#viz-box {
+    height: 12;
+    border: round $surface-lighten-2;
+    padding: 0 1;
+    margin-top: 1;
+}
+#viz-box .lbl { text-style: bold; }
+#viz-box .cap { color: $text-muted; }
+Sparkline { height: 6; margin: 0 0; }
+Sparkline > .sparkline--max-color { color: $success; }
+Sparkline > .sparkline--min-color { color: $success 40%; }
+
+/* ---------- modals ---------- */
+ModalScreen { align: center middle; }
+#modal {
+    width: 70;
+    height: auto;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+#modal .q { margin-bottom: 1; }
+#modal Horizontal { height: auto; align: right middle; }
+#modal Button { margin-left: 1; }
+#help-box {
+    width: 72;
+    height: auto;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}

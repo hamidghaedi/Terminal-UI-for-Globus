@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "globus-tui"
+version = "0.1.0"
+description = "Lightweight terminal UI for monitoring Globus transfer tasks"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "globus-sdk>=3.50",
+    "textual>=0.80",
+]
+
+[project.scripts]
+globus-tui = "globus_tui.cli:main"
+
+[tool.setuptools]
+packages = ["globus_tui"]
+
+[tool.setuptools.package-data]
+globus_tui = ["*.tcss"]
