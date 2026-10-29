@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
+import subprocess
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -149,6 +151,95 @@ class GlobusBackend:
 
 
 # --------------------------------------------------------------------------
+# Existing Globus CLI session (no second OAuth client or token copying)
+# --------------------------------------------------------------------------
+class CLIBackend:
+    name = "cli"
+
+    def __init__(self, executable: Optional[str] = None, timeout: int = 20):
+        self.executable = executable or shutil.which("globus")
+        if not self.executable:
+            raise RuntimeError("Globus CLI not found. Install globus-cli or use --backend sdk.")
+        self.timeout = timeout
+
+    def _run(self, *args) -> dict:
+        try:
+            result = subprocess.run(
+                [self.executable, *args, "--format", "json"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                timeout=self.timeout, check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"Globus CLI timed out after {self.timeout}s; press r to retry.") from exc
+        except OSError as exc:
+            raise RuntimeError(f"Cannot run Globus CLI: {exc}") from exc
+        if result.returncode:
+            message = result.stderr.strip() or "command failed"
+            raise RuntimeError(f"Globus CLI: {message[:800]}")
+        try:
+            document = json.loads(result.stdout)
+        except ValueError as exc:
+            raise RuntimeError("Globus CLI returned invalid JSON.") from exc
+        if not isinstance(document, dict):
+            raise RuntimeError("Globus CLI returned an unexpected response.")
+        return document
+
+    def _tasks(self, types, statuses, since, limit):
+        return self._run(
+            "api", "transfer", "GET", "/task_list",
+            "--query-param", f"limit={limit}",
+            "--query-param", "orderby=request_time DESC",
+            "--query-param", f"filter={GlobusBackend._filter(types, statuses, since)}",
+        )
+
+    def login_required(self):
+        # Check the actual Transfer scope, not just the existence of a token file.
+        self._tasks(TASK_TYPES, TASK_STATUSES, None, 1)
+        return False
+
+    def login(self, force=False):
+        raise RuntimeError("This backend uses your CLI session. Run `globus login` in your terminal.")
+
+    def logout(self):
+        raise RuntimeError("CLI login is shared with other tools. Manage it separately with `globus logout`.")
+
+    def identity(self):
+        return "Globus CLI session"
+
+    def list_tasks(self, types=TASK_TYPES, statuses=TASK_STATUSES, since=None, limit=100):
+        if not types or not statuses:
+            return []
+        return self._tasks(types, statuses, since, limit)["DATA"]
+
+    def count_tasks(self, statuses, since=None):
+        if not statuses:
+            return 0
+        # The high-level `globus task list` strips `total`; retain API metadata.
+        return int(self._tasks(TASK_TYPES, statuses, since, 1)["total"])
+
+    def get_task(self, task_id):
+        return self._run("task", "show", str(uuid.UUID(task_id)))
+
+    def events(self, task_id, limit=200):
+        try:
+            return self._run("task", "event-list", str(uuid.UUID(task_id)), "--limit", str(limit))["DATA"]
+        except RuntimeError as exc:
+            return [{"code": "ERROR", "description": "could not load events",
+                     "details": str(exc), "is_error": True, "time": ""}]
+
+    def cancel(self, task_id):
+        r = self._run("task", "cancel", str(uuid.UUID(task_id)))
+        return f"{r.get('code')}: {r.get('message')}"
+
+    def set_label(self, task_id, label):
+        self._run("task", "update", str(uuid.UUID(task_id)), "--label", label)
+
+    def flow_runs(self, since=None, limit=10):
+        # CLI monitoring requests no new Flows consent.
+        return None
+
+
+# --------------------------------------------------------------------------
 # Demo backend
 # --------------------------------------------------------------------------
 class DemoBackend:
@@ -286,5 +377,12 @@ class DemoBackend:
         return []
 
 
-def make_backend(demo: bool = False, client_id: Optional[str] = None, flows: bool = True):
-    return DemoBackend() if demo else GlobusBackend(client_id=client_id, flows=flows)
+def make_backend(demo: bool = False, client_id: Optional[str] = None, flows: bool = True,
+                 backend: str = "auto"):
+    if demo:
+        return DemoBackend()
+    if backend == "cli" or (backend == "auto" and not client_id
+                            and not os.environ.get("GLOBUS_TUI_CLIENT_ID")
+                            and not load_config().get("client_id") and shutil.which("globus")):
+        return CLIBackend()
+    return GlobusBackend(client_id=client_id, flows=flows)

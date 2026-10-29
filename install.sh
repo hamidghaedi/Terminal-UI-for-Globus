@@ -4,6 +4,7 @@
 #   ./install.sh            install into ~/.local/share/globus-tui/venv, wire Ctrl+G
 #   ./install.sh --login    ...and run the one-time Globus login at the end
 #   ./install.sh --no-rc    do not touch ~/.bashrc / ~/.zshrc
+#   ./install.sh --editable  use this checkout directly during development
 #
 # Override the interpreter with PYTHON=/path/to/python3 (3.9+). On Alliance
 # clusters:  module load python/3.11 && ./install.sh
@@ -12,11 +13,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 prefix="${GLOBUS_TUI_PREFIX:-$HOME/.local/share/globus-tui}"
 venv="$prefix/venv"
 bindir="$HOME/.local/bin"
-do_login=0; touch_rc=1
+do_login=0; touch_rc=1; editable=0
 for a in "$@"; do
     case "$a" in
         --login) do_login=1 ;;
         --no-rc) touch_rc=0 ;;
+        --editable) editable=1 ;;
         *) echo "unknown option $a" >&2; exit 2 ;;
     esac
 done
@@ -42,7 +44,11 @@ if [ ! -x "$venv/bin/python" ]; then
     "$py" -m venv "$venv" || { echo "python -m venv failed; try: module load python/3.11" >&2; exit 1; }
 fi
 "$venv/bin/python" -m pip install --quiet --upgrade pip
-"$venv/bin/python" -m pip install --quiet --upgrade "$here"
+if [ "$editable" = 1 ]; then
+    "$venv/bin/python" -m pip install --quiet --upgrade --editable "$here"
+else
+    "$venv/bin/python" -m pip install --quiet --upgrade "$here"
+fi
 ln -sf "$venv/bin/globus-tui" "$bindir/globus-tui"
 echo "Installed: $bindir/globus-tui -> $venv"
 
@@ -65,8 +71,9 @@ fi
 # --- login ------------------------------------------------------------------
 if [ "$do_login" = 1 ]; then
     echo; echo "== Globus login: open the URL in any browser, approve, paste the code back =="
-    "$bindir/globus-tui" --login
+    "$bindir/globus-tui" --backend sdk --login
 else
-    echo; echo "Next: run   globus-tui --login   once (needs a human to paste a code),"
-    echo "then open a new shell and press Ctrl+G.   Try it first with: globus-tui --demo"
+    echo; echo "Next: run   globus-tui --check   to verify your existing Globus CLI session."
+    echo "Then open a new shell and press Ctrl+G.   Try fake data with: globus-tui --demo"
+    echo "For a separate native-app login: globus-tui --backend sdk --login"
 fi

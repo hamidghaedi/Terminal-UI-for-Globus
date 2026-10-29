@@ -17,6 +17,12 @@ dependencies = [
 [project.scripts]
 globus-tui = "globus_tui.cli:main"
 
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.setuptools]
 packages = ["globus_tui"]
 

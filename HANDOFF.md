@@ -15,15 +15,25 @@ bash once the hotkey is sourced. It talks to `transfer.api.globus.org`,
 
 Repository: https://github.com/hamidghaedi/Terminal-UI-for-Globus
 
+**Existing CLI authentication:** the default `auto` backend now uses an installed
+`globus` command. First run `globus-tui --backend cli --check`. If that passes,
+launch the TUI directly; no new browser consent is needed. Tokens are not copied
+or inspected. CLI calls time out after 20 seconds. Flows require the separate SDK
+backend. The native-app login instructions below apply to `--backend sdk` only;
+use `globus-tui --backend sdk --login` for that route. A CLI login problem is
+resolved by the user running `globus login`, and CLI logout is managed separately
+so the TUI does not revoke a session shared with other project tools.
+
 ## 1. Hard constraints to respect
 
 1. **Run on a login node (or any node with outbound HTTPS).** Compute nodes
    on most clusters have no internet, so the TUI cannot run there. Do not
    submit it as a job.
-2. **The Globus login step is interactive and needs a human.** `globus-tui
-   --login` prints a URL; the user must open it in their own browser, approve,
+2. **A new Globus login is interactive and needs a human.** `globus-tui
+   --backend sdk --login` prints a URL; the user must open it in their own browser, approve,
    and paste a code back into the terminal. You cannot complete this step
-   yourself. Do everything else, then hand that one command to the user.
+   yourself. Check the existing CLI session first; only hand back a login command
+   when authentication is actually required.
 3. **Do not install into the system Python, do not use `sudo`, do not use
    `pip install --user` into a cluster module's site-packages.** The installer
    makes a private venv under `~/.local/share/globus-tui/venv`.
@@ -118,7 +128,7 @@ Tell the user to run, in a terminal where they can open a browser on their
 laptop:
 
 ```bash
-globus-tui --login
+globus-tui --backend sdk --login
 ```
 
 then open a new shell (or `source ~/.bashrc`) and press **Ctrl+G**. Also

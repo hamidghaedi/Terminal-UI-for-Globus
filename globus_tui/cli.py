@@ -36,7 +36,8 @@ def _check(backend) -> int:
         line(True, "demo backend, no login needed")
         return 0 if ok else 1
     need = backend.login_required()
-    line(not need, "Globus tokens present" if not need else "not logged in: run `globus-tui --login` (interactive)")
+    authenticated = "Existing Globus CLI session authenticated" if backend.name == "cli" else "Globus tokens present"
+    line(not need, authenticated if not need else "not logged in: run `globus-tui --login` (interactive)")
     if not need:
         try:
             backend.count_tasks(("ACTIVE", "INACTIVE"))
@@ -63,6 +64,8 @@ def main(argv=None) -> int:
     )
     p.add_argument("--demo", action="store_true", help="run with fake data, no login needed")
     p.add_argument("--tasks", action="store_true", help="open on the Activity (task list) screen")
+    p.add_argument("--backend", choices=("auto", "cli", "sdk"), default=cfg.get("backend", "auto"),
+                   help="authentication backend (auto prefers an installed Globus CLI)")
     p.add_argument("-i", "--interval", type=int, default=cfg.get("interval", 30),
                    help="auto-refresh interval in seconds (default 30)")
     p.add_argument("--client-id", default=None,
@@ -76,17 +79,33 @@ def main(argv=None) -> int:
     p.add_argument("--version", action="version", version=f"globus-tui {__version__}")
     args = p.parse_args(argv)
 
-    backend = make_backend(demo=args.demo, client_id=args.client_id, flows=not args.no_flows)
+    backend = make_backend(demo=args.demo, client_id=args.client_id, flows=not args.no_flows,
+                           backend=args.backend)
 
     if args.check:
-        return _check(backend)
+        try:
+            return _check(backend)
+        except RuntimeError as exc:
+            print(f"[FAIL] {exc}\nFor CLI authentication, run `globus login` in your terminal.", file=sys.stderr)
+            return 1
+
+    if backend.name == "cli":
+        try:
+            if args.login:
+                backend.login()
+            if args.logout:
+                backend.logout()
+            backend.login_required()
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.logout:
         backend.logout()
         print("Logged out; stored tokens removed.")
         return 0
 
-    if args.login or backend.login_required():
+    if args.login or (backend.name != "cli" and backend.login_required()):
         if args.login or sys.stdin.isatty():
             print("Globus login needed. A URL will be shown; open it in any browser, approve, and paste the code back.")
             backend.login(force=args.login)
