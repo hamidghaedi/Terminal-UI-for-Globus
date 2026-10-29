@@ -23,25 +23,28 @@ daemon, no browser.
 
 ![Event log with transfer-rate sparkline](docs/event-log.svg)
 
-## Install
+## Install (HPC login node, no root)
 
 ```bash
+module load python/3.11      # if the cluster's default python is older than 3.9
 git clone https://github.com/hamidghaedi/Terminal-UI-for-Globus.git ~/globus-tui
 cd ~/globus-tui
-./install.sh
+./install.sh                 # private venv under ~/.local/share/globus-tui, command in ~/.local/bin
+globus-tui --login           # once; prints a URL, paste the code back
 ```
 
-`install.sh` does three things: `pipx install` (or `pip install --user`),
-a one-time Globus login, and adds `source ~/globus-tui/shell/globus-tui.bash`
-to your `~/.bashrc` (and `~/.zshrc` if present).
+`install.sh` creates its own venv (nothing touches the system or module
+Python), symlinks `globus-tui` into `~/.local/bin`, and appends one commented
+line to `~/.bashrc` (and `~/.zshrc` if present) that adds that directory to
+PATH and binds **Ctrl+G**. Pass `--no-rc` to skip the rc edit, `--login` to
+run the login at the end, or `PYTHON=/some/python3 ./install.sh` to choose the
+interpreter.
 
-Manual equivalent:
-
-```bash
-pipx install .              # or: pip install --user .
-globus-tui --login          # prints a URL, paste the code back
-source shell/globus-tui.bash
-```
+Run it on a login node; compute nodes usually have no route to the Globus
+API. `globus-tui --check` prints a non-interactive environment report (Python,
+encoding, TERM, tokens, API reachability) and is what to run when something
+looks off. See `HANDOFF.md` for a step-by-step guide aimed at someone (or an
+agent) installing it on a cluster for you.
 
 Try it without an account first:
 
@@ -97,7 +100,7 @@ Task         o overview    l event log   F faults only   e edit label   x termin
 ## Options
 
 ```
-globus-tui [--demo] [--tasks] [-i SECONDS] [--client-id UUID] [--no-flows] [--login] [--logout]
+globus-tui [--demo] [--tasks] [-i SECONDS] [--client-id UUID] [--no-flows] [--login] [--logout] [--check]
 ```
 
 `--no-flows` skips the Flows scope entirely if you never use flows and want a
@@ -107,12 +110,14 @@ smaller consent screen at login.
 
 ```
 globus_tui/
-  cli.py       argument parsing, login handling, launches the app
+  cli.py       argument parsing, --check / --login, launches the app
   backend.py   GlobusBackend (Transfer + Flows via globus-sdk UserApp) and DemoBackend
   fmt.py       byte / rate / date formatting and the web-app style status lines
   app.py       Textual screens: Dashboard, Tasks, TaskDetail, modals
   app.tcss     styling
 shell/         bash, zsh and tmux bindings
+install.sh     venv-based user-space installer for login nodes
+HANDOFF.md     install guide for a person or agent setting this up on a cluster
 ```
 
 The backend is a small interface (`list_tasks`, `count_tasks`, `get_task`,
@@ -121,6 +126,9 @@ source or adding screens (e.g. collections, timers) is straightforward.
 
 ## Notes
 
+* If the terminal locale is not UTF-8 (common on clusters with `LANG=C`),
+  the UI switches to ASCII glyphs; `export LANG=C.UTF-8` or set
+  `GLOBUS_TUI_ASCII=1` to force either way.
 * Task event history is kept by Globus for 30 days; older tasks show a
   "could not load events" entry in the Event Log, same as the web app.
 * Total estimated bytes can grow while a task is still scanning directories,

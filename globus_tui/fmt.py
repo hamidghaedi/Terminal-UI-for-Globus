@@ -44,7 +44,7 @@ def parse_iso(s: Optional[str]) -> Optional[datetime]:
 def local_dt(s: Optional[str], fmt: str = "%m/%d/%Y, %I:%M %p") -> str:
     dt = parse_iso(s)
     if dt is None:
-        return "—"
+        return "-"
     return dt.astimezone().strftime(fmt)
 
 
@@ -55,7 +55,7 @@ def local_time(s: Optional[str]) -> str:
 def duration(start: Optional[str], end: Optional[str] = None) -> str:
     a = parse_iso(start)
     if a is None:
-        return "—"
+        return "-"
     b = parse_iso(end) or datetime.now(timezone.utc)
     secs = int((b - a).total_seconds())
     if secs < 0:

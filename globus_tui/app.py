@@ -19,16 +19,30 @@ from textual.widgets import (Button, DataTable, Input, Sparkline, Static,
 from . import fmt
 from .backend import TASK_STATUSES, TASK_TYPES
 
+def _utf8_ok() -> bool:
+    """HPC login nodes sometimes run with LANG=C; fall back to ASCII glyphs."""
+    import os
+    import sys
+
+    if os.environ.get("GLOBUS_TUI_ASCII"):
+        return False
+    enc = (getattr(sys.stdout, "encoding", None) or "").lower()
+    return "utf" in enc
+
+
+UTF8 = _utf8_ok()
+
 STATUS_ICON = {
-    "ACTIVE": ("▶", "bold #1e78c8"),
-    "INACTIVE": ("‖", "bold yellow"),
-    "SUCCEEDED": ("✔", "bold green"),
-    "FAILED": ("✖", "bold red"),
+    "ACTIVE": ("▶" if UTF8 else ">", "bold #1e78c8"),
+    "INACTIVE": ("‖" if UTF8 else "|", "bold yellow"),
+    "SUCCEEDED": ("✔" if UTF8 else "+", "bold green"),
+    "FAILED": ("✖" if UTF8 else "x", "bold red"),
 }
+BAR_ON, BAR_OFF, ELLIPSIS = ("█", "░", "…") if UTF8 else ("#", "-", "~")
 
 
 def icon(status: str) -> Text:
-    ch, style = STATUS_ICON.get(status, ("•", ""))
+    ch, style = STATUS_ICON.get(status, ("*", ""))
     return Text(ch, style=style)
 
 
@@ -37,14 +51,14 @@ def bar(frac: Optional[float], width: int = 18) -> Text:
         return Text("scanning...", style="dim")
     n = int(round(frac * width))
     t = Text()
-    t.append("█" * n, style="#1e78c8")
-    t.append("░" * (width - n), style="grey50")
+    t.append(BAR_ON * n, style="#1e78c8")
+    t.append(BAR_OFF * (width - n), style="grey50")
     t.append(f" {frac * 100:5.1f}%")
     return t
 
 
 def ellipsis(s: str, n: int) -> str:
-    return s if len(s) <= n else s[: n - 1] + "…"
+    return s if len(s) <= n else s[: n - 1] + ELLIPSIS
 
 
 # ------------------------------------------------------------------------
@@ -243,7 +257,7 @@ class TasksScreen(RefreshingScreen):
         self.tasks: list[dict] = []
 
     def compose(self) -> ComposeResult:
-        yield TopBar("Activity  ›  Tasks")
+        yield TopBar("Activity > Tasks")
         yield Input(placeholder="search tasks by label or collection   (/ to focus, esc to leave)", id="search")
         yield Static("", id="filterbar")
         yield DataTable(id="task-table", cursor_type="row", zebra_stripes=True)
@@ -389,20 +403,20 @@ class TaskDetailScreen(RefreshingScreen):
             yield Static("", classes="lbl", id="head-label")
             yield Static("", id="detail-progress")
         with TabbedContent(initial="overview"):
-            with TabPane("ⓘ Overview (o)", id="overview"):
+            with TabPane("Overview (o)", id="overview"):
                 with Horizontal(id="overview-body"):
                     yield Static("", id="kv")
                     with Vertical(id="stats-col"):
                         yield Static("", id="actions")
                         yield Static("", id="stats")
-            with TabPane("☰ Event Log (l)", id="events"):
+            with TabPane("Event Log (l)", id="events"):
                 with Horizontal(id="events-body"):
                     yield DataTable(id="event-table", cursor_type="row", zebra_stripes=True)
                     with Vertical(id="event-side"):
                         yield Static("", id="event-detail")
                         with Vertical(id="viz-box"):
                             yield Static("Event Log Visualization", classes="lbl")
-                            yield Static("transfer rate (Mbit/s), oldest → newest", classes="cap")
+                            yield Static("transfer rate (Mbit/s), oldest -> newest", classes="cap")
                             yield Sparkline([], summary_function=max, id="rate-spark")
                             yield Static("", classes="cap", id="viz-range")
 
@@ -433,7 +447,7 @@ class TaskDetailScreen(RefreshingScreen):
         self.task_doc, self.event_docs = task, events
         t = task
         label = t.get("label") or t["task_id"]
-        self.query_one(TopBar).query_one(".title", Static).update(f"Task  ›  {ellipsis(label, 70)}")
+        self.query_one(TopBar).query_one(".title", Static).update(f"Task > {ellipsis(label, 70)}")
         head = Text.assemble(icon(t["status"]), " ", (label, "bold"), "\n", (fmt.status_message(t), "dim"))
         head.no_wrap, head.overflow = True, "ellipsis"
         self.query_one("#head-label", Static).update(head)
@@ -446,8 +460,8 @@ class TaskDetailScreen(RefreshingScreen):
         kv.add_column()
         rows = [
             ("Task Label", label),
-            ("Source", t.get("source_endpoint_display_name") or "—"),
-            ("Destination", t.get("destination_endpoint_display_name") or "—"),
+            ("Source", t.get("source_endpoint_display_name") or "-"),
+            ("Destination", t.get("destination_endpoint_display_name") or "-"),
             ("Task ID", t["task_id"]),
             ("Owner", t.get("owner_string") or self.app.backend.identity()),
             ("Condition", Text(t["status"], style=STATUS_ICON.get(t["status"], ("", ""))[1])),
@@ -455,15 +469,15 @@ class TaskDetailScreen(RefreshingScreen):
             ("Completed" if t.get("completion_time") else "Deadline",
              fmt.local_dt(t.get("completion_time") or t.get("deadline"))),
             ("Duration", fmt.duration(t.get("request_time"), t.get("completion_time"))),
-            ("Base Paths", f"Source       {t.get('source_base_path') or '—'}\n"
-                           f"Destination  {t.get('destination_base_path') or '—'}"),
-            ("Transfer Settings", "\n".join("• " + s for s in fmt.transfer_settings(t))),
+            ("Base Paths", f"Source       {t.get('source_base_path') or '-'}\n"
+                           f"Destination  {t.get('destination_base_path') or '-'}"),
+            ("Transfer Settings", "\n".join("- " + s for s in fmt.transfer_settings(t))),
         ]
         if t.get("fatal_error"):
             fe = t["fatal_error"]
             rows.insert(6, ("Fatal Error", Text(f"{fe.get('code')}: {fe.get('description')}", style="red")))
         if t.get("nice_status") and t["nice_status"] not in ("OK", "Queued"):
-            rows.insert(6, ("Nice Status", Text(f"{t['nice_status']} — {t.get('nice_status_short_description') or ''}",
+            rows.insert(6, ("Nice Status", Text(f"{t['nice_status']} - {t.get('nice_status_short_description') or ''}",
                                                 style="yellow")))
         for k, v in rows:
             kv.add_row(k, v)
@@ -530,7 +544,7 @@ class TaskDetailScreen(RefreshingScreen):
         rng = self.query_one("#viz-range", Static)
         if rates:
             tf = "%I:%M:%S %p"
-            rng.update(f"{fmt.local_dt(times[0], tf)} → {fmt.local_dt(times[-1], tf)}  "
+            rng.update(f"{fmt.local_dt(times[0], tf)} -> {fmt.local_dt(times[-1], tf)}  "
                        f"min {min(rates):.0f}  max {max(rates):.0f}  last {rates[-1]:.0f}")
         else:
             rng.update("no progress events")
