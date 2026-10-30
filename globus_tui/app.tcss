@@ -3,6 +3,16 @@ Screen {
     layout: vertical;
 }
 
+.shortcut-guide {
+    dock: bottom;
+    height: auto;
+    min-height: 3;
+    padding: 0 1;
+    border-top: solid $primary;
+    background: $surface;
+    color: $text;
+}
+
 #topbar {
     height: 3;
     padding: 0 2;
@@ -143,6 +153,8 @@ ModalScreen { align: center middle; }
 #help-box {
     width: 72;
     height: auto;
+    max-height: 100%;
+    overflow-y: auto;
     padding: 1 2;
     border: thick $primary;
     background: $surface;

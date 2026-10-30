@@ -8,7 +8,7 @@ from typing import Optional
 
 from rich.table import Table
 from rich.text import Text
-from textual import on, work
+from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -77,6 +77,29 @@ class TopBar(Horizontal):
         self.query_one("#meta", Static).update(text)
 
 
+class ShortcutGuide(Static):
+    """A docked guide that stays visible while the screen contents scroll."""
+
+    NAVIGATION = "[b]d[/b] Dashboard   [b]t[/b] Tasks   [b]q[/b] Quit   [b]?[/b] Help"
+    CONTEXT = {
+        "dashboard": NAVIGATION + "\n[b]Enter[/b] Open task   [b]r[/b] Refresh   [b]p[/b] Pause/resume",
+        "tasks": NAVIGATION + "\n[b]Enter[/b] Open   [b]/[/b] Search   [b]r[/b] Refresh   [b]p[/b] Pause   [b]x[/b] Cancel task",
+        "search": "Type to search tasks.\n[b]Enter[/b] or [b]Esc[/b] Return to the list and navigation shortcuts",
+        "detail": NAVIGATION + "   [b]Esc[/b] Back\n[b]o[/b] Overview   [b]l[/b] Events   [b]F[/b] Faults   [b]e[/b] Label   [b]x[/b] Cancel   [b]r[/b] Refresh   [b]p[/b] Pause",
+        "confirm": "[b]y[/b] Confirm termination   [b]n[/b] or [b]Esc[/b] Keep task running",
+        "label": "Type the new task label.\n[b]Enter[/b] Save label   [b]Esc[/b] Cancel editing",
+        "help": "[b]Esc[/b] or [b]?[/b] Close help and return to the previous screen",
+    }
+
+    def __init__(self, context: str):
+        self.guide_text = self.CONTEXT[context]
+        super().__init__(self.guide_text, classes="shortcut-guide")
+
+    def set_context(self, context: str) -> None:
+        self.guide_text = self.CONTEXT[context]
+        self.update(self.guide_text)
+
+
 class RefreshingScreen(Screen):
     """Screen with a periodic data refresh and a visible countdown."""
 
@@ -140,11 +163,8 @@ class DashboardScreen(RefreshingScreen):
                 yield Static("", id="active-empty")
             yield Static("Flow Runs", classes="section-title")
             yield Static("", id="flows-box")
-            yield Static(
-                "t  Activity (all tasks)    enter  open task    r  refresh    q  quit",
-                classes="hint",
-            )
             yield Static(f"Signed in as {self.app.backend.identity()}", classes="tip")
+        yield ShortcutGuide("dashboard")
 
     def on_mount(self) -> None:
         t = self.query_one("#active-table", DataTable)
@@ -262,6 +282,10 @@ class TasksScreen(RefreshingScreen):
         yield Static("", id="filterbar")
         yield DataTable(id="task-table", cursor_type="row", zebra_stripes=True)
         yield Static("", id="empty")
+        yield ShortcutGuide("tasks")
+
+    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        self.query_one(ShortcutGuide).set_context("search" if isinstance(event.widget, Input) else "tasks")
 
     def on_mount(self) -> None:
         t = self.query_one("#task-table", DataTable)
@@ -419,6 +443,7 @@ class TaskDetailScreen(RefreshingScreen):
                             yield Static("transfer rate (Mbit/s), oldest -> newest", classes="cap")
                             yield Sparkline([], summary_function=max, id="rate-spark")
                             yield Static("", classes="cap", id="viz-range")
+        yield ShortcutGuide("detail")
 
     def on_mount(self) -> None:
         self.query_one("#event-table", DataTable).add_columns("Time", "Code", "Description")
@@ -627,6 +652,7 @@ class Confirm(ModalScreen[bool]):
             with Horizontal():
                 yield Button("Cancel (n)", id="no")
                 yield Button("Terminate (y)", variant="error", id="yes")
+        yield ShortcutGuide("confirm")
 
     @on(Button.Pressed)
     def _b(self, ev: Button.Pressed) -> None:
@@ -651,6 +677,7 @@ class TextPrompt(ModalScreen[Optional[str]]):
         with Vertical(id="modal"):
             yield Static(self.title_, classes="q")
             yield Input(value=self.value, id="prompt-input")
+        yield ShortcutGuide("label")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -688,6 +715,7 @@ class HelpScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         yield Static(self.TEXT, id="help-box")
+        yield ShortcutGuide("help")
 
 
 # ------------------------------------------------------------------------

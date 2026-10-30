@@ -102,6 +102,10 @@ If `Ctrl+G` is taken on your setup, change the key in the one `bind` line.
 
 ## Keys inside the TUI
 
+A shortcut guide stays at the bottom of every screen, including task details,
+event logs and dialogs. It changes while typing in the search or label fields
+to show how to finish editing and return to navigation.
+
 ```
 Everywhere   d dashboard   t activity   r refresh   p pause   enter open   esc back   ? help   q quit
 Activity     / search      T D  toggle TRANSFER / DELETE     a i f s  toggle ACTIVE / INACTIVE / FAILED / SUCCEEDED
